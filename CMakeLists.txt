@@ -18,7 +18,8 @@ file(GLOB_RECURSE SOURCES LIST_DIRECTORIES false CONFIGURE_DEPENDS "sources/*.cp
 add_executable(${ProjectName} ${SOURCES})
 
 target_include_directories(${ProjectName} PUBLIC "sources" "C:/Program Files (x86)/OpenAL 1.1 SDK/include")
-#target_link_libraries(${ProjectName} CircleCITest)
+target_link_directories(${ProjectName} PUBLIC "C:/Program Files (x86)/OpenAL 1.1 SDK/libs/Win64")
+target_link_libraries(${ProjectName} OpenAL32)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
