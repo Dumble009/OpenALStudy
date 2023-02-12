@@ -184,6 +184,19 @@ int main(void)
         return 0;
     }
 
+    // ソースの作成
+    constexpr int SOURCE_COUNT = 1;
+    std::vector<ALuint> alSources(SOURCE_COUNT);
+    alGenSources(SOURCE_COUNT, alSources.data());
+
+    // バッファをソースにアタッチ
+    alSourcei(alSources[0], AL_BUFFER, alBuffers[0]);
+    alSourcePlay(alSources[0]);
+
+    std::cout << "Please Press Key to Exit." << std::endl;
+    char tmpC;
+    std::cin >> tmpC;
+
     auto Context = alcGetCurrentContext();
     Device = alcGetContextsDevice(Context);
     alcMakeContextCurrent(NULL);
