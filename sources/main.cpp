@@ -219,6 +219,7 @@ int main(void)
         return -1;
     }
 
+    std::cout << "Play!" << std::endl;
     alSourcePlay(alSources[0]);
     alResult = alGetError();
     if (alResult != AL_NO_ERROR)
@@ -227,9 +228,23 @@ int main(void)
         return -1;
     }
 
-    std::cout << "Please Press Key to Exit." << std::endl;
+    ALint playingState;
+    // AL_PLAYINGになるまで待つ
+    do
+    {
+        alGetSourcei(alSources[0], AL_SOURCE_STATE, &playingState);
+    } while (playingState != AL_PLAYING);
+
+    // AL_PLAYINGを抜けるまで待つ
+    std::cout << "Become Playing" << std::endl;
+    do
+    {
+        alGetSourcei(alSources[0], AL_SOURCE_STATE, &playingState);
+    } while (playingState == AL_PLAYING);
+
+    /*std::cout << "Please Press Key to Exit." << std::endl;
     char tmpC;
-    std::cin >> tmpC;
+    std::cin >> tmpC;*/
 
     alDeleteBuffers(BUFFER_COUNT, alBuffers.data());
     alDeleteSources(SOURCE_COUNT, alSources.data());
