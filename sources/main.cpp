@@ -1,6 +1,7 @@
 ﻿// ----------STLのinclude----------
 #include <iostream>
 #include <string>
+#include <vector>
 
 // ----------OpenALのinclude-------
 #include "al.h"
@@ -10,6 +11,120 @@
 #include "WavAgent.h"
 
 constexpr std::string_view WAV_FILE_PATH = "assets/beep.wav";
+
+void loadWaveData(std::vector<wavAgent::SampleUnsigned8bit> &wave,
+                  const wavAgent::SoundData &soundData)
+{
+    wavAgent::MetaData metaData{};
+    auto ret = soundData.GetMetaData(&metaData);
+    if (!wavAgent::IsWavAgentActionSucceeded(ret))
+    {
+        std::cout << "Getting MetaData failed. : " << wavAgent::GetDescriptionOfErrorCode(ret) << std::endl;
+        return;
+    }
+
+    int channelCount;
+    ret = metaData.GetChannelCount(channelCount);
+    if (!wavAgent::IsWavAgentActionSucceeded(ret))
+    {
+        std::cerr << "Getting ChannnelCount failed. : " << wavAgent::GetDescriptionOfErrorCode(ret) << std::endl;
+        return;
+    }
+
+    std::vector<void *> pWaves(channelCount, nullptr);
+    for (int channel = 0; channel < channelCount; channel++)
+    {
+        ret = soundData.GetWave(&pWaves[channel], channel);
+        if (!wavAgent::IsWavAgentActionSucceeded(ret))
+        {
+            std::cerr << "Getting WaveData failed. : " << wavAgent::GetDescriptionOfErrorCode(ret) << std::endl;
+            return;
+        }
+    }
+
+    wavAgent::SampleFormatType sampleFormatType;
+    ret = metaData.GetSampleFormat(sampleFormatType);
+    if (!wavAgent::IsWavAgentActionSucceeded(ret))
+    {
+        std::cerr << "Getting SampleFormat failed. : " << wavAgent::GetDescriptionOfErrorCode(ret) << std::endl;
+        return;
+    }
+
+    int sampleCount;
+    ret = metaData.GetSampleCount(sampleCount);
+    if (!wavAgent::IsWavAgentActionSucceeded(ret))
+    {
+        std::cerr << "Getting SampleCount failed. : " << wavAgent::GetDescriptionOfErrorCode(ret) << std::endl;
+        return;
+    }
+
+    int bytesPerSample = wavAgent::GetByteSizeOfFormat(sampleFormatType);
+
+    // pWavesの内容を、チャンネル1のサンプル1->チャンネル2のサンプル1->チャンネル1のサンプル2->チャンネル2のサンプル2->...といった形に並び替え
+    for (int sample = 0; sample < sampleCount; sample++)
+    {
+        for (int channel = 0; channel < channelCount; channel++)
+        {
+            for (int bytes = 0; bytes < bytesPerSample; bytes++)
+            {
+                wave.push_back(
+                    ((wavAgent::SampleUnsigned8bit *)pWaves[channel])[sample * bytesPerSample + bytes]);
+            }
+        }
+    }
+}
+
+ALenum convertSampleFormatTypeToALenum(const wavAgent::MetaData &metaData)
+{
+    wavAgent::SampleFormatType sampleFormatType;
+    int channelCount;
+    auto ret = metaData.GetSampleFormat(sampleFormatType);
+    if (!wavAgent::IsWavAgentActionSucceeded(ret))
+    {
+        std::cerr << "Getting SampleFormat failed. : " << wavAgent::GetDescriptionOfErrorCode(ret) << std::endl;
+        return AL_INVALID_ENUM;
+    }
+
+    ret = metaData.GetChannelCount(channelCount);
+    if (!wavAgent::IsWavAgentActionSucceeded(ret))
+    {
+        std::cerr << "Getting ChannelCount failed. : " << wavAgent::GetDescriptionOfErrorCode(ret) << std::endl;
+        return AL_INVALID_ENUM;
+    }
+
+    if (channelCount == 1)
+    {
+        if (sampleFormatType == wavAgent::SampleFormatType::WAV_AGENT_SAMPLE_STRUCTURE_UNSIGNED_8_BIT)
+        {
+            return AL_FORMAT_MONO8;
+        }
+
+        if (sampleFormatType == wavAgent::SampleFormatType::WAV_AGENT_SAMPLE_STRUCTURE_SIGNED_16_BIT)
+        {
+            return AL_FORMAT_MONO16;
+        }
+    }
+    else if (channelCount == 2)
+    {
+        if (sampleFormatType == wavAgent::SampleFormatType::WAV_AGENT_SAMPLE_STRUCTURE_UNSIGNED_8_BIT)
+        {
+            return AL_FORMAT_STEREO8;
+        }
+
+        if (sampleFormatType == wavAgent::SampleFormatType::WAV_AGENT_SAMPLE_STRUCTURE_SIGNED_16_BIT)
+        {
+            return AL_FORMAT_STEREO16;
+        }
+    }
+
+    return AL_INVALID_ENUM;
+}
+
+#define CHECK_WAV_AGENT_RESULT(val)                                                                            \
+    if (!wavAgent::IsWavAgentActionSucceeded(val))                                                             \
+    {                                                                                                          \
+        std::cerr << "WavAgent operation failed. : " << wavAgent::GetDescriptionOfErrorCode(val) << std::endl; \
+    }
 
 int main(void)
 {
@@ -28,14 +143,46 @@ int main(void)
 
     auto wavSoundData = wavAgent::SoundData();
     auto wavAgentResult = wavAgent::Load(WAV_FILE_PATH, &wavSoundData);
+    CHECK_WAV_AGENT_RESULT(wavAgentResult)
 
-    if (!wavAgent::IsWavAgentActionSucceeded(wavAgentResult))
+    // バッファの作成
+    constexpr int BUFFER_COUNT = 1;
+    std::vector<ALuint> alBuffers(BUFFER_COUNT);
+    alGenBuffers(BUFFER_COUNT, alBuffers.data());
+
+    // SoundDataからの波形データの取得
+    std::vector<wavAgent::SampleUnsigned8bit> wave;
+    loadWaveData(wave, wavSoundData);
+
+    wavAgent::MetaData metaData{};
+    wavAgentResult = wavSoundData.GetMetaData(&metaData);
+    CHECK_WAV_AGENT_RESULT(wavAgentResult)
+
+    // OpenAL上でのフォーマットの取得
+    ALenum format = convertSampleFormatTypeToALenum(metaData);
+    if (format == AL_INVALID_ENUM)
     {
-        std::cout << "WavAgent Load is failed.\n"
-                  << wavAgent::GetDescriptionOfErrorCode(wavAgentResult) << std::endl;
+        std::cerr << "Converting SampleFormatType To ALenum is failed." << std::endl;
+        return 0;
     }
 
+    // サンプリング周波数の取得
+    int freqHz;
+    wavAgentResult = metaData.GetSamplingFreqHz(freqHz);
+    CHECK_WAV_AGENT_RESULT(wavAgentResult)
+
     alGetError(); // エラーコードをクリア
+
+    // バッファへのデータの格納
+    alBufferData(alBuffers[0], format, wave.data(), (ALsizei)wave.size(), freqHz);
+
+    auto alResult = alGetError();
+
+    if (alResult != AL_NO_ERROR)
+    {
+        std::cerr << "alBufferData failed." << std::endl;
+        return 0;
+    }
 
     auto Context = alcGetCurrentContext();
     Device = alcGetContextsDevice(Context);
