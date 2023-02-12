@@ -137,6 +137,8 @@ int main(void)
         auto Context = alcCreateContext(Device, NULL);
     }
 
+    alGetError(); // エラーコードをクリア
+
     auto defaultDeviceSpecifier = alcGetString(NULL, ALC_DEFAULT_DEVICE_SPECIFIER);
     std::string deviceName = std::string(defaultDeviceSpecifier);
     std::cout << "Device Name is : " << deviceName << std::endl;
@@ -149,6 +151,13 @@ int main(void)
     constexpr int BUFFER_COUNT = 1;
     std::vector<ALuint> alBuffers(BUFFER_COUNT);
     alGenBuffers(BUFFER_COUNT, alBuffers.data());
+
+    auto alResult = alGetError();
+    if (alResult != AL_NO_ERROR)
+    {
+        std::cerr << "alGenBuffers failed." << std::endl;
+        return -1;
+    }
 
     // SoundDataからの波形データの取得
     std::vector<wavAgent::SampleUnsigned8bit> wave;
@@ -163,7 +172,7 @@ int main(void)
     if (format == AL_INVALID_ENUM)
     {
         std::cerr << "Converting SampleFormatType To ALenum is failed." << std::endl;
-        return 0;
+        return -1;
     }
 
     // サンプリング周波数の取得
@@ -171,17 +180,14 @@ int main(void)
     wavAgentResult = metaData.GetSamplingFreqHz(freqHz);
     CHECK_WAV_AGENT_RESULT(wavAgentResult)
 
-    alGetError(); // エラーコードをクリア
-
     // バッファへのデータの格納
     alBufferData(alBuffers[0], format, wave.data(), (ALsizei)wave.size(), freqHz);
 
-    auto alResult = alGetError();
-
+    alResult = alGetError();
     if (alResult != AL_NO_ERROR)
     {
         std::cerr << "alBufferData failed." << std::endl;
-        return 0;
+        return -1;
     }
 
     // ソースの作成
@@ -189,13 +195,36 @@ int main(void)
     std::vector<ALuint> alSources(SOURCE_COUNT);
     alGenSources(SOURCE_COUNT, alSources.data());
 
+    alResult = alGetError();
+    if (alResult != AL_NO_ERROR)
+    {
+        std::cerr << "alGetSources failed." << std::endl;
+        return -1;
+    }
+
     // バッファをソースにアタッチ
     alSourcei(alSources[0], AL_BUFFER, alBuffers[0]);
+    alResult = alGetError();
+    if (alResult != AL_NO_ERROR)
+    {
+        std::cerr << "alSourcei failed." << std::endl;
+        return -1;
+    }
+
     alSourcePlay(alSources[0]);
+    alResult = alGetError();
+    if (alResult != AL_NO_ERROR)
+    {
+        std::cerr << "alSourcePlay failed." << std::endl;
+        return -1;
+    }
 
     std::cout << "Please Press Key to Exit." << std::endl;
     char tmpC;
     std::cin >> tmpC;
+
+    alDeleteBuffers(BUFFER_COUNT, alBuffers.data());
+    alDeleteSources(SOURCE_COUNT, alSources.data());
 
     auto Context = alcGetCurrentContext();
     Device = alcGetContextsDevice(Context);
