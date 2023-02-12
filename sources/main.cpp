@@ -23,6 +23,8 @@ int main(void)
 
     auto g_bEAX = alIsExtensionPresent("EAX2.0");
 
+    std::cout << "g_bEAX = " << (int)g_bEAX << std::endl;
+
     alGetError();
 
     auto Context = alcGetCurrentContext();
