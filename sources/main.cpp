@@ -143,6 +143,14 @@ int main(void)
     std::string deviceName = std::string(defaultDeviceSpecifier);
     std::cout << "Device Name is : " << deviceName << std::endl;
 
+    auto deviceNames = alcGetString(NULL, ALC_ALL_DEVICES_SPECIFIER);
+    while (deviceNames && *deviceNames != NULL)
+    {
+        std::string name = std::string(deviceNames);
+        std::cout << name << std::endl;
+        deviceNames += strlen(deviceNames) + 1;
+    }
+
     auto wavSoundData = wavAgent::SoundData();
     auto wavAgentResult = wavAgent::Load(WAV_FILE_PATH, &wavSoundData);
     CHECK_WAV_AGENT_RESULT(wavAgentResult)
