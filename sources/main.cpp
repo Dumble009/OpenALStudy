@@ -6,6 +6,11 @@
 #include "al.h"
 #include "alc.h"
 
+// ----------WavAgentのinclude-----
+#include "WavAgent.h"
+
+constexpr std::string_view WAV_FILE_PATH = "assets/beep.wav";
+
 int main(void)
 {
     std::cout << "Start!!" << std::endl;
@@ -21,11 +26,16 @@ int main(void)
     std::string deviceName = std::string(defaultDeviceSpecifier);
     std::cout << "Device Name is : " << deviceName << std::endl;
 
-    auto g_bEAX = alIsExtensionPresent("EAX2.0");
+    auto wavSoundData = wavAgent::SoundData();
+    auto wavAgentResult = wavAgent::Load(WAV_FILE_PATH, &wavSoundData);
 
-    std::cout << "g_bEAX = " << (int)g_bEAX << std::endl;
+    if (!wavAgent::IsWavAgentActionSucceeded(wavAgentResult))
+    {
+        std::cout << "WavAgent Load is failed.\n"
+                  << wavAgent::GetDescriptionOfErrorCode(wavAgentResult) << std::endl;
+    }
 
-    alGetError();
+    alGetError(); // エラーコードをクリア
 
     auto Context = alcGetCurrentContext();
     Device = alcGetContextsDevice(Context);
