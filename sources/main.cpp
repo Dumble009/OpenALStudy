@@ -124,6 +124,7 @@ ALenum convertSampleFormatTypeToALenum(const wavAgent::MetaData &metaData)
     if (!wavAgent::IsWavAgentActionSucceeded(val))                                                             \
     {                                                                                                          \
         std::cerr << "WavAgent operation failed. : " << wavAgent::GetDescriptionOfErrorCode(val) << std::endl; \
+        return -1;                                                                                             \
     }
 
 int main(void)
@@ -135,6 +136,7 @@ int main(void)
     if (Device)
     {
         auto Context = alcCreateContext(Device, NULL);
+        alcMakeContextCurrent(Context);
     }
 
     alGetError(); // エラーコードをクリア
@@ -188,6 +190,8 @@ int main(void)
     wavAgentResult = metaData.GetSamplingFreqHz(freqHz);
     CHECK_WAV_AGENT_RESULT(wavAgentResult)
 
+    std::cout << wave.size() << ":" << freqHz << std::endl;
+
     // バッファへのデータの格納
     alBufferData(alBuffers[0], format, wave.data(), (ALsizei)wave.size(), freqHz);
 
@@ -233,6 +237,12 @@ int main(void)
     do
     {
         alGetSourcei(alSources[0], AL_SOURCE_STATE, &playingState);
+        alResult = alGetError();
+        if (alResult != AL_NO_ERROR)
+        {
+            std::cerr << "alGetSourcei failed." << std::endl;
+            return -1;
+        }
     } while (playingState != AL_PLAYING);
 
     // AL_PLAYINGを抜けるまで待つ
